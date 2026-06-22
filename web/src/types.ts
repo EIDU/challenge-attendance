@@ -10,3 +10,5 @@ export interface ClassRoster {
   date: string;
   students: Student[];
 }
+
+export type AttendanceStatus = "pending" | "present" | "absent" | "late";
