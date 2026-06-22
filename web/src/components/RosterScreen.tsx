@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { fetchRoster } from "../api/client";
-import type { ClassRoster } from "../types";
+import { fetchRoster, markAttendance } from "../api/client";
+import type { AttendanceStatus, ClassRoster } from "../types";
 import { StudentRow } from "./StudentRow";
 
 interface RosterScreenProps {
@@ -8,55 +8,66 @@ interface RosterScreenProps {
   classId: string;
 }
 
-type LoadState =
-  | { status: "loading" }
-  | { status: "error"; message: string }
-  | { status: "ready"; roster: ClassRoster };
+// Remembers the marks made so far this session.
+let savedMarks: Record<string, AttendanceStatus> = {};
 
-/**
- * Owns the roster-loading state for a class. State lives in the component that
- * uses it; children are passed plain data.
- */
 export function RosterScreen({ schoolId, classId }: RosterScreenProps) {
-  const [state, setState] = useState<LoadState>({ status: "loading" });
+  const [roster, setRoster] = useState<ClassRoster | null>(null);
+  const [marks, setMarks] = useState<Record<string, AttendanceStatus>>({});
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    let cancelled = false;
-    setState({ status: "loading" });
-
     fetchRoster(schoolId, classId)
-      .then((roster) => {
-        if (!cancelled) setState({ status: "ready", roster });
-      })
-      .catch((error: unknown) => {
-        if (!cancelled) {
-          const message =
-            error instanceof Error ? error.message : "Unknown error";
-          setState({ status: "error", message });
-        }
+      .then((r) => setRoster(r))
+      .catch((e: unknown) => {
+        setError(e instanceof Error ? e.message : "Unknown error");
       });
-
-    return () => {
-      cancelled = true;
-    };
   }, [schoolId, classId]);
 
-  if (state.status === "loading") {
+  function handleMark(studentId: string, status: AttendanceStatus) {
+    // Update the UI immediately.
+    savedMarks[studentId] = status;
+    setMarks({ ...savedMarks });
+
+    // Persist in the background.
+    markAttendance(schoolId, classId, studentId, status).catch(() => {
+      setError(`Could not save attendance for ${studentId}`);
+    });
+  }
+
+  function markAllPresent() {
+    if (!roster) return;
+    for (const student of roster.students) {
+      handleMark(student.id, "present");
+    }
+  }
+
+  if (error) {
+    return <p role="alert">{error}</p>;
+  }
+
+  if (!roster) {
     return <p>Loading roster…</p>;
   }
 
-  if (state.status === "error") {
-    return <p role="alert">Could not load roster: {state.message}</p>;
-  }
+  const markedCount = Object.keys(marks).length;
 
-  const { roster } = state;
   return (
     <section>
       <h1>{roster.className}</h1>
       <p>{roster.date}</p>
+      <p>
+        {markedCount} / {roster.students.length} marked
+      </p>
+      <button onClick={markAllPresent}>Mark all present</button>
       <ul className="roster">
         {roster.students.map((student) => (
-          <StudentRow key={student.id} student={student} />
+          <StudentRow
+            key={student.id}
+            student={student}
+            status={marks[student.id]}
+            onMark={handleMark}
+          />
         ))}
       </ul>
     </section>
