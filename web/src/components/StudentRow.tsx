@@ -1,13 +1,19 @@
-import type { Student } from "../types";
+import type { AttendanceStatus, Student } from "../types";
 
-/**
- * Presentational only: given a student, render a row. No data fetching, no
- * business logic. The PR will extend this to show/toggle attendance.
- */
-export function StudentRow({ student }: { student: Student }) {
+interface StudentRowProps {
+  student: Student;
+  status: AttendanceStatus | undefined;
+  onMark: (studentId: string, status: AttendanceStatus) => void;
+}
+
+export function StudentRow({ student, status, onMark }: StudentRowProps) {
   return (
     <li className="student-row">
       <span className="student-name">{student.name}</span>
+      <button onClick={() => onMark(student.id, "present")}>Present</button>
+      <button onClick={() => onMark(student.id, "absent")}>Absent</button>
+      <button onClick={() => onMark(student.id, "late")}>Late</button>
+      {status ? <span className="status">{status}</span> : null}
     </li>
   );
 }
