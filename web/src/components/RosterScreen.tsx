@@ -8,48 +8,23 @@ interface RosterScreenProps {
   classId: string;
 }
 
-type LoadState =
-  | { status: "loading" }
-  | { status: "error"; message: string }
-  | { status: "ready"; roster: ClassRoster };
-
-/**
- * Owns the roster-loading state for a class. State lives in the component that
- * uses it; children are passed plain data.
- */
 export function RosterScreen({ schoolId, classId }: RosterScreenProps) {
-  const [state, setState] = useState<LoadState>({ status: "loading" });
+  const [roster, setRoster] = useState<ClassRoster | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-    setState({ status: "loading" });
-
-    fetchRoster(schoolId, classId)
-      .then((roster) => {
-        if (!cancelled) setState({ status: "ready", roster });
-      })
-      .catch((error: unknown) => {
-        if (!cancelled) {
-          const message =
-            error instanceof Error ? error.message : "Unknown error";
-          setState({ status: "error", message });
-        }
-      });
-
+    fetchRoster(schoolId, classId).then((loaded) => {
+      if (!cancelled) setRoster(loaded);
+    });
     return () => {
       cancelled = true;
     };
   }, [schoolId, classId]);
 
-  if (state.status === "loading") {
+  if (!roster) {
     return <p>Loading roster…</p>;
   }
 
-  if (state.status === "error") {
-    return <p role="alert">Could not load roster: {state.message}</p>;
-  }
-
-  const { roster } = state;
   return (
     <section>
       <h1>{roster.className}</h1>
